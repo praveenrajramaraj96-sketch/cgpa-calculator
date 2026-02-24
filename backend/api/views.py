@@ -25,11 +25,12 @@ def extract_marksheet(request):
         Act as a transcript data extractor. Look at this marksheet and extract all subjects into a JSON array.
         Strictly follow this JSON format:
         {
-          "subjects": [{"code": "string", "name": "string", "credits": number, "grade": "string", "points": number}],
-          "gpa": number
+          "subjects": [{"code": "string", "name": "string", "credits": 4.0, "grade": "string", "points": 10.0}],
+          "gpa": 8.5
         }
         Map grades: O=10, A+=9, A=8, B+=7, B=6, C=5, D=4.
         If a value is unclear, use your best visual judgment of the row/column alignment.
+        CRITICAL: Return ONLY valid JSON. Do not use trailing commas. Do not include markdown blocks. Ensure all keys and strings have double quotes.
         """
 
         # 3. Process image
@@ -44,8 +45,18 @@ def extract_marksheet(request):
                 generation_config={"response_mime_type": "application/json"}
             )
 
-            # Safely load the JSON because Gemini is strictly configured to output only JSON
-            data = json.loads(response.text)
+            # Clean response text in case Gemini adds markdown formatting despite restrictions
+            raw_text = response.text.strip()
+            if raw_text.startswith("```json"):
+                raw_text = raw_text.replace("```json", "", 1)
+            if raw_text.startswith("```"):
+                raw_text = raw_text.replace("```", "", 1)
+            if raw_text.endswith("```"):
+                raw_text = raw_text[:-3]
+            raw_text = raw_text.strip()
+
+            # Safely load the JSON
+            data = json.loads(raw_text)
             
             # Logic Check: Recalculate GPA to verify AI results
             subjects = data.get('subjects', [])
