@@ -55,7 +55,7 @@ const UploadResult = ({ onUploadComplete }) => {
         formData.append('file', imageFile);
 
         try {
-            const response = await fetch('http://127.0.0.1:8000/api/extract-marksheet/', {
+            const response = await fetch('https://backend-three-eta-42.vercel.app/api/extract-marksheet/', {
                 method: 'POST',
                 body: formData,
                 // Note: Don't set Content-Type header; browser does it for FormData
