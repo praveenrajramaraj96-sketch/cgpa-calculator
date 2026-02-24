@@ -3,8 +3,14 @@ import google.generativeai as genai
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
+import os
+
 # Get your key from https://aistudio.google.com/app/apikey
-genai.configure(api_key="AIzaSyD4GrgS-diNqrbvQUKf_ysDp-5FS0KxcTQ")
+api_key = os.environ.get("GEMINI_API_KEY")
+if api_key:
+    genai.configure(api_key=api_key)
+else:
+    print("Warning: GEMINI_API_KEY is not set.")
 
 @csrf_exempt
 def extract_marksheet(request):
