@@ -32,12 +32,12 @@ def extract_marksheet(request):
         # Mime type check to ensure other images formats don't crash
         mime_type = image_file.content_type if hasattr(image_file, 'content_type') else 'image/jpeg'
 
-        response = model.generate_content(
-            [prompt, {'mime_type': mime_type, 'data': img_data}],
-            generation_config={"response_mime_type": "application/json"}
-        )
-
         try:
+            response = model.generate_content(
+                [prompt, {'mime_type': mime_type, 'data': img_data}],
+                generation_config={"response_mime_type": "application/json"}
+            )
+
             # Safely load the JSON because Gemini is strictly configured to output only JSON
             data = json.loads(response.text)
             
@@ -49,6 +49,11 @@ def extract_marksheet(request):
             
             return JsonResponse(data)
         except Exception as e:
-            return JsonResponse({'error': 'Parsing failed', 'details': str(e)}, status=500)
+            # Also handle cases where safety filter removes response text
+            if hasattr(e, 'message'):
+                err_msg = e.message
+            else:
+                err_msg = str(e)
+            return JsonResponse({'error': 'AI processing failed', 'details': err_msg}, status=500)
 
     return JsonResponse({'error': 'Invalid request'}, status=400)

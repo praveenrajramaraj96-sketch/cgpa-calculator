@@ -51,36 +51,95 @@ const UploadResult = ({ onUploadComplete }) => {
         setIsProcessing(true);
         setLoadingText("Sending to AI Engine...");
 
-        const formData = new FormData();
-        formData.append('file', imageFile);
-
         try {
+            // Compress Image
+            const compressedFile = await compressImage(imageFile);
+            
+            const formData = new FormData();
+            formData.append('file', compressedFile);
+
             const response = await fetch('https://backend-three-eta-42.vercel.app/api/extract-marksheet/', {
                 method: 'POST',
                 body: formData,
-                // Note: Don't set Content-Type header; browser does it for FormData
             });
 
-            if (!response.ok) throw new Error("Server Error");
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(`Server returned ${response.status}: ${errText}`);
+            }
 
             const data = await response.json();
 
-            // Check if the AI math matches our calculated math
+            if (data.error) {
+                throw new Error(`API Error: ${data.details || data.error}`);
+            }
+
             if (data.subjects && data.subjects.length > 0) {
                 onUploadComplete({
                     gpa: data.calculated_gpa || data.gpa,
                     subjects: data.subjects
                 });
             } else {
-                throw new Error("No subjects detected");
+                throw new Error("No subjects detected in the image");
             }
 
         } catch (error) {
-            console.error(error);
-            alert("AI Extraction failed. Please try a clearer photo.");
+            console.error("Extraction error:", error);
+            // Don't just show a generic 'clearer photo' error if it's a server error
+            alert(`AI Extraction failed: ${error.message}`);
         } finally {
             setIsProcessing(false);
         }
+    };
+
+    const compressImage = (file) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 1200;
+                    const MAX_HEIGHT = 1600;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    canvas.toBlob((blob) => {
+                        if (!blob) {
+                            reject(new Error('Canvas is empty'));
+                            return;
+                        }
+                        const newFile = new File([blob], file.name, {
+                            type: 'image/jpeg',
+                            lastModified: Date.now()
+                        });
+                        resolve(newFile);
+                    }, 'image/jpeg', 0.85); // 85% quality
+                };
+                img.onerror = (err) => reject(err);
+            };
+            reader.onerror = (error) => reject(error);
+        });
     };
 
     return (
